@@ -1,0 +1,31 @@
+[package]
+name = "mandelbrot2"
+version = "0.1.0"
+edition = "2021"
+authors = ["Flippette <quangdatle2006@outlook.com>"]
+license = "MIT"
+
+[features]
+default = ["parallel"]
+parallel = ["dep:rayon"]
+
+[dependencies]
+image = "0.24"
+eyre = "0.6"
+rayon = { version = "1.6", optional = true }
+clap = { version = "4.0", features = ["derive"] }
+
+[dev-dependencies]
+criterion = "0.4"
+
+[lib]
+bench = false
+
+[[bin]]
+name = "mandelbrot2"
+path = "src/main.rs"
+bench = false
+
+[[bench]]
+name = "trace_bench"
+harness = false
