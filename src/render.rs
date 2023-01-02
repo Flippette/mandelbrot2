@@ -51,15 +51,29 @@ pub fn trace(x: f64, y: f64, cfg: &Config) -> ExitTrace {
     let c = Complex64::new(x, y);
     let mut z = Complex64::new(0, 0);
 
-    for step in 0..cfg.max_steps {
+    #[allow(unused_variables)]
+    let mut last_z;
+
+    for step in (0..cfg.max_steps).step_by(2) {
+        last_z = z.square() + c;
         z = z.square() + c;
 
-        if z.re.abs() + cfg.viewport_displacement.0 > cfg.viewport_size.0
-            || z.re.abs() + cfg.viewport_displacement.1 > cfg.viewport_size.1
-        {
-            return ExitTrace::Early(cfg.max_steps - step);
+        if is_oob(&z, cfg) {
+            let mut steps = cfg.max_steps - step;
+
+            if is_oob(&last_z, cfg) {
+                steps -= 1;
+            }
+
+            return ExitTrace::Early(steps);
         }
     }
 
     ExitTrace::Late(0) // black is a special case
+}
+
+#[inline]
+fn is_oob(c: &Complex64, cfg: &Config) -> bool {
+    c.re.abs() + cfg.viewport_displacement.0 > cfg.viewport_size.0
+        || c.re.abs() + cfg.viewport_displacement.1 > cfg.viewport_size.1
 }
