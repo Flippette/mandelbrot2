@@ -40,7 +40,7 @@ pub fn render(cfg: &Config) -> Result<Vec<u8>> {
 
     #[cfg(not(feature = "parallel"))]
     #[rustfmt::skip]
-    return Ok(line_iter
+    return Ok(col_iter
         .into_iter()
         .flat_map(|y| row_iter(y, cfg, &lut))
         .flatten()
