@@ -3,6 +3,7 @@ use crate::config::Config;
 use eyre::{ensure, Result};
 use std::fs;
 
+#[derive(Debug)]
 pub struct Lut {
     pub table: Vec<[u8; 3]>,
 }

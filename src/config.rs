@@ -9,7 +9,7 @@ pub struct Config {
     #[arg(
         short = 'i',
         long,
-        value_parser = parse_comma_pair::<u64>
+        value_parser = parse_comma_pair::<u32>
     )]
     pub image_size: (u32, u32),
 

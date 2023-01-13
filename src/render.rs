@@ -1,5 +1,7 @@
 use crate::{complex::Complex64, config::Config, lut::Lut};
 
+use std::time::Instant;
+
 use eyre::Result;
 #[cfg(feature = "parallel")]
 use rayon::prelude::*;
@@ -25,8 +27,17 @@ pub fn render(cfg: &Config) -> Result<Vec<u8>, RenderError> {
         let v_step = cfg.viewport_size.1 / f64::from(cfg.image_size.1);
 
         (0..cfg.image_size.0).map(move |x| {
-            let x = f64::from(x - cfg.image_size.0 / 2) * h_step + cfg.viewport_displacement.0;
-            let y = f64::from(y - cfg.image_size.1 / 2) * v_step + cfg.viewport_displacement.1;
+            // we know x, y and cfg.image_size are u32s,
+            // thus, abs(diff) <= u32::MAX as i64,
+            // and so it's fine to cast the difference to f64 (32 < 52)
+
+            #[allow(clippy::cast_precision_loss)]
+            let x = (i64::from(x) - i64::from(cfg.image_size.0) / 2) as f64 * h_step
+                + cfg.viewport_displacement.0;
+
+            #[allow(clippy::cast_precision_loss)]
+            let y = (i64::from(y) - i64::from(cfg.image_size.1) / 2) as f64 * v_step
+                + cfg.viewport_displacement.1;
 
             match trace(x, y, cfg) {
                 ExitTrace::Early(steps) => lut.table[steps as usize % lut.table.len()],
@@ -36,6 +47,9 @@ pub fn render(cfg: &Config) -> Result<Vec<u8>, RenderError> {
     }
 
     let col_iter = 0..cfg.image_size.1 / 2;
+
+    let timer = Instant::now();
+    println!("[info] starting rendering...");
 
     // render top half
 
@@ -67,6 +81,10 @@ pub fn render(cfg: &Config) -> Result<Vec<u8>, RenderError> {
 
     let expected_buf_size = cfg.image_size.0 as usize * cfg.image_size.1 as usize * 3;
     if render_buf.len() == expected_buf_size {
+        println!(
+            "[info] rendering finished in {}ms.",
+            timer.elapsed().as_millis()
+        );
         Ok(render_buf)
     } else {
         Err(RenderError::MalformedBuffer {
