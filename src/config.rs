@@ -11,7 +11,7 @@ pub struct Config {
         long,
         value_parser = parse_comma_pair::<u64>
     )]
-    pub image_size: (u64, u64),
+    pub image_size: (u32, u32),
 
     // viewport size in units
     #[arg(

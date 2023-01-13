@@ -12,7 +12,10 @@ impl Lut {
         let mut table = Vec::new();
 
         for line in fs::read_to_string(&cfg.lut)?.trim().lines() {
-            let tokens = line.split_whitespace().collect::<Vec<_>>();
+            let tokens = line
+                .split_whitespace()
+                .map(str::parse)
+                .try_collect::<Vec<_>>()?;
             ensure!(
                 tokens.len() == 3,
                 "invalid LUT: colors must be formatted in trios"
@@ -20,9 +23,9 @@ impl Lut {
 
             #[rustfmt::skip]
             table.push([
-                tokens[0].parse()?,
-                tokens[1].parse()?,
-                tokens[2].parse()?,
+                tokens[0],
+                tokens[1],
+                tokens[2],
             ]);
         }
 

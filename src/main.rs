@@ -1,20 +1,19 @@
 use clap::Parser;
 use eyre::{eyre, Result};
-use image::{ImageBuffer, Rgb};
-use mandelbrot2::*;
+use image::RgbImage;
+use mandelbrot2::{config::Config, render::render};
 
 fn main() -> Result<()> {
-    let config = config::Config::try_parse()?;
+    let config = Config::try_parse()?;
 
-    let frame_data = render::render(&config)?;
-    let img_buffer = ImageBuffer::<Rgb<u8>, _>::from_vec(
-        config.image_size.0 as u32,
-        config.image_size.1 as u32,
-        frame_data,
-    )
-    .ok_or_else(|| eyre!("malformed render buffer!"))?;
+    let frame_data = match render(&config) {
+        Ok(data) => data,
+        Err(e) => panic!("{e:?}"),
+    };
+    let image = RgbImage::from_vec(config.image_size.0, config.image_size.1, frame_data)
+        .ok_or_else(|| eyre!("failed to create internal image!"))?;
 
-    img_buffer.save(config.output)?;
+    image.save(config.output)?;
 
     Ok(())
 }

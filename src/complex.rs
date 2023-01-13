@@ -7,6 +7,7 @@ pub struct Complex64 {
 }
 
 impl Complex64 {
+    #[must_use]
     #[inline]
     pub fn new<T: Into<f64>, U: Into<f64>>(re: T, im: U) -> Self {
         Self {
@@ -15,6 +16,7 @@ impl Complex64 {
         }
     }
 
+    #[must_use]
     #[inline]
     pub fn square(&self) -> Self {
         Self::new(
@@ -27,6 +29,7 @@ impl Complex64 {
 impl Add<Self> for Complex64 {
     type Output = Self;
 
+    #[must_use]
     #[inline]
     fn add(self, rhs: Self) -> Self::Output {
         Self::new(self.re + rhs.re, self.im + rhs.im)

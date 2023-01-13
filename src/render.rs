@@ -4,23 +4,29 @@ use eyre::Result;
 #[cfg(feature = "parallel")]
 use rayon::prelude::*;
 
+#[repr(u8)]
 pub enum ExitTrace {
     Early(u8),
     Late(u8),
 }
 
-pub fn render(cfg: &Config) -> Result<Vec<u8>> {
-    let lut = Lut::from_cfg(cfg)?;
+#[derive(Debug)]
+pub enum RenderError {
+    LutParsingFailure,
+    MalformedBuffer { expected: usize, received: usize },
+}
+
+pub fn render(cfg: &Config) -> Result<Vec<u8>, RenderError> {
+    let Ok(lut) = Lut::from_cfg(cfg) else { return Err(RenderError::LutParsingFailure); };
 
     // isolated to make separating between `parallel` and normal easier
-    fn row_iter<'a>(y: u64, cfg: &'a Config, lut: &'a Lut) -> impl Iterator<Item = [u8; 3]> + 'a {
+    fn row_iter<'a>(y: u32, cfg: &'a Config, lut: &'a Lut) -> impl Iterator<Item = [u8; 3]> + 'a {
+        let h_step = cfg.viewport_size.0 / f64::from(cfg.image_size.0);
+        let v_step = cfg.viewport_size.1 / f64::from(cfg.image_size.1);
+
         (0..cfg.image_size.0).map(move |x| {
-            let x = (x as i64 - cfg.image_size.0 as i64 / 2) as f64 * cfg.viewport_size.0
-                / cfg.image_size.0 as f64
-                + cfg.viewport_displacement.0;
-            let y = (y as i64 - cfg.image_size.1 as i64 / 2) as f64 * cfg.viewport_size.1
-                / cfg.image_size.1 as f64
-                + cfg.viewport_displacement.1;
+            let x = f64::from(x - cfg.image_size.0 / 2) * h_step + cfg.viewport_displacement.0;
+            let y = f64::from(y - cfg.image_size.1 / 2) * v_step + cfg.viewport_displacement.1;
 
             match trace(x, y, cfg) {
                 ExitTrace::Early(steps) => lut.table[steps as usize % lut.table.len()],
@@ -29,24 +35,48 @@ pub fn render(cfg: &Config) -> Result<Vec<u8>> {
         })
     }
 
-    let col_iter = 0..cfg.image_size.1;
+    let col_iter = 0..cfg.image_size.1 / 2;
+
+    // render top half
 
     #[cfg(feature = "parallel")]
-    return Ok(col_iter
+    let mut render_buf = col_iter
         .into_par_iter()
         .flat_map_iter(|y| row_iter(y, cfg, &lut))
         .flatten_iter()
-        .collect());
+        .collect::<Vec<_>>();
 
     #[cfg(not(feature = "parallel"))]
-    #[rustfmt::skip]
-    return Ok(col_iter
+    #[rustfmt::skip] // oh the horror of long lines
+    let mut render_buf = col_iter
         .into_iter()
         .flat_map(|y| row_iter(y, cfg, &lut))
         .flatten()
-        .collect());
+        .collect::<Vec<_>>();
+
+    render_buf.reserve(render_buf.len()); // reserve space for bottom half to avoid allocation
+    debug_assert!(render_buf.capacity() >= 2 * render_buf.len());
+
+    // copy & reverse buffer into bottom half
+    for i in (0..cfg.image_size.1 / 2).rev() {
+        let start = i as usize * cfg.image_size.0 as usize * 3;
+        let end = start + cfg.image_size.0 as usize * 3;
+
+        render_buf.extend_from_within(start..end);
+    }
+
+    let expected_buf_size = cfg.image_size.0 as usize * cfg.image_size.1 as usize * 3;
+    if render_buf.len() == expected_buf_size {
+        Ok(render_buf)
+    } else {
+        Err(RenderError::MalformedBuffer {
+            expected: expected_buf_size,
+            received: render_buf.len(),
+        })
+    }
 }
 
+#[must_use]
 pub fn trace(x: f64, y: f64, cfg: &Config) -> ExitTrace {
     let c = Complex64::new(x, y);
     let mut z = Complex64::new(0, 0);
